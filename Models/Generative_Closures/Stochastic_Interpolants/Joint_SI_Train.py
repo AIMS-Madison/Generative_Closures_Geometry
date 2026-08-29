@@ -1,23 +1,26 @@
+import os
+import sys
 import warnings
-from torch.optim import Adam
-from utils import *
-import os, sys
+from pathlib import Path
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 import h5py
-from Interpolant import *
-from Generative_Models import FNO2d_Orig
+from torch.optim import Adam
+from utils import *
+from Models.Generative_Closures.Interpolant import *
+from Models.Generative_Closures.Generative_Models import FNO2d_Orig
 from Models.Pretrained_Autoencoders.AE import VariationalAutoEncoder
+from project_paths import project_path
 
 warnings.filterwarnings("ignore")
 
 from torch.utils.data import DataLoader
 
 def train_joint_si(
-    h5file='Data_Generaion/train_diffusion_nonlinear.h5',
+    h5file='Data_Generation/train_diffusion_nonlinear.h5',
     cond_key='train_vorticity_64',
     targ_key='train_nonlinear_64',
     max_samples=10000,
@@ -27,9 +30,16 @@ def train_joint_si(
     epochs=1000,
     scheduler_step=100,
     scheduler_gamma=0.5,
-    device='cuda',
-    save_dir='Models/Stochastic_Interpolant/Latent_SI/Joint_SI',
+    device='auto',
+    save_dir='Trained_Models/SI/Latent_SI/Joint_training',
 ):
+    device = resolve_device(device)
+    h5file = Path(h5file)
+    save_dir = Path(save_dir)
+    if not h5file.is_absolute():
+        h5file = project_path(h5file)
+    if not save_dir.is_absolute():
+        save_dir = project_path(save_dir)
     os.makedirs(save_dir, exist_ok=True)
 
     full_dataset = H5ClosureDataset(h5file, cond_key, targ_key, max_samples=max_samples)
@@ -39,9 +49,6 @@ def train_joint_si(
     AEW_model = VariationalAutoEncoder().to(device)
     SI_model = FNO2d_Orig(modes1=4, modes2=4, width=20, padding=0, embed_dim=256, length=1).to(device)
     
-    # AEH_model.load_state_dict(torch.load('Models/Autoencoders/Joint_AE_Nonlinear_SI.pth'))
-    # AEW_model.load_state_dict(torch.load('Models/Autoencoders/Joint_AE_Vorticity_SI.pth'))
-    # SI_model.load_state_dict(torch.load('Models/Stochastic_Interpolant/Latent_SI/Joint_SI/Joint_SI_Model.pth'))
     optimizer = Adam(list(SI_model.parameters()) + list(AEW_model.parameters()) + list(AEH_model.parameters()), lr=lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
     interp = Interpolant(device)
@@ -98,8 +105,8 @@ def train_joint_si(
     torch.save(SI_model.state_dict(), os.path.join(save_dir, 'Joint_SI_KnownSDE.pth'))
     torch.save(AEH_model.state_dict(), os.path.join(save_dir, 'Joint_AE_Nonlinear_SI_KnownSDE.pth'))
     torch.save(AEW_model.state_dict(), os.path.join(save_dir, 'Joint_AE_Vorticity_SI_KnownSDE.pth'))
-    
-            # save loss statistics
+
+    # Save final loss statistics.
     with open(os.path.join(save_dir, 'loss_stats.txt'), 'a') as f:
         f.write(f"{ep} {avg_loss:.3e} {recon_loss_x.item():.3e} {recon_loss_w.item():.3e} "
                 f"{kl_loss.item():.3e} {si_loss.item():.3e} {fro_x:.3e} {fro_w:.3e}\n")

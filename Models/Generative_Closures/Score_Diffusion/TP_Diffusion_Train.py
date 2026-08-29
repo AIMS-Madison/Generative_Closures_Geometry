@@ -1,8 +1,9 @@
-import os, sys
+import sys
+from pathlib import Path
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
     
 import h5py
 import torch
@@ -10,7 +11,13 @@ from torch.optim import Adam
 from functools import partial
 from tqdm import trange
 from utils import *
-from Generative_Models import (marginal_prob_std, diffusion_coeff, FNO2d_Diffusion, loss_fn)
+from Models.Generative_Closures.Generative_Models import (
+    FNO2d_Diffusion,
+    diffusion_coeff,
+    loss_fn,
+    marginal_prob_std,
+)
+from project_paths import project_path, resolve_output_path
 
 # Check if CUDA is available
 if torch.cuda.is_available():
@@ -21,7 +28,7 @@ else:
     device = torch.device('cpu')
 
 # Load the data
-train_name = 'Data_Generation/train_diffusion_nonlinear.h5'
+train_name = project_path('Data_Generation', 'train_diffusion_nonlinear.h5')
 
 
 with h5py.File(train_name, 'r') as file:
@@ -76,7 +83,7 @@ for epoch in tqdm_epoch:
     avg_loss = 0.
     num_items = 0
     for x, w in train_loader:
-        x, w = x.cuda(), w.cuda()
+        x, w = x.to(device), w.to(device)
         optimizer.zero_grad()
         loss, _, _ = loss_fn(model, x, w, None, marginal_prob_std_fn, sparse=False)
         loss.backward()
@@ -91,5 +98,5 @@ for epoch in tqdm_epoch:
     loss_history.append(avg_loss_epoch)
     tqdm_epoch.set_description('Average Loss: {:5f}'.format(avg_loss / num_items))
 
-savepath = 'Models/Score_Diffusion/P-CDM.pth'
+savepath = resolve_output_path('Trained_Models/DM/Physics_DM/P-CDM.pth')
 torch.save(model.state_dict(), savepath)

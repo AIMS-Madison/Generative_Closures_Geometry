@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import pytorch_lightning as pl
 from einops import rearrange
 
 ################################
@@ -138,7 +137,7 @@ class VAEDecoder(nn.Module):
     def forward(self, x):
         return self.decoder(x)
 
-class VariationalAutoEncoder(pl.LightningModule):
+class VariationalAutoEncoder(nn.Module):
     def __init__(self,
                  in_channels: int = 1,
                  latent_channels: int = 1,

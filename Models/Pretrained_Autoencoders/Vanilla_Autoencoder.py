@@ -1,13 +1,15 @@
-import os, sys
+import sys
+from pathlib import Path
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
     
 import h5py
 import torch
 import torch.nn as nn
-from AE import VariationalAutoEncoder
+from Models.Pretrained_Autoencoders.AE import VariationalAutoEncoder
+from project_paths import project_path, resolve_output_path
 from utils import ErrorMetrics
 
 # ------------------------------
@@ -15,7 +17,7 @@ from utils import ErrorMetrics
 # ------------------------------
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-file_name = 'Data_Generation/train_diffusion_nonlinear.h5'
+file_name = project_path('Data_Generation', 'train_diffusion_nonlinear.h5')
 with h5py.File(file_name, 'r') as file:
     X_train = torch.tensor(file['train_nonlinear_64'][:], device=device)
     X_test = torch.tensor(file['train_nonlinear_64'][:100], device=device)
@@ -82,7 +84,10 @@ for epoch in range(1, num_epochs+1):
     if val_loss < best_val_loss:
         best_val_loss = val_loss
         counter = 0
-        torch.save(model.state_dict(), 'vanilla_autoencoder.pth')
+        torch.save(
+            model.state_dict(),
+            resolve_output_path('Trained_Models/AE/Nonlinear/AE_Nonlinear_ReconOnly.pth'),
+        )
     else:
         counter += 1
         if counter >= patience:

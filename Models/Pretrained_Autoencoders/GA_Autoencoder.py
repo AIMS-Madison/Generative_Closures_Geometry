@@ -1,7 +1,10 @@
-import os, sys
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+import os
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
     
 import h5py
 import numpy as np
@@ -11,7 +14,8 @@ import phate
 from torch.utils.data import DataLoader, TensorDataset
 import warnings
 from scipy.sparse import SparseEfficiencyWarning
-from AE import VariationalAutoEncoder
+from Models.Pretrained_Autoencoders.AE import VariationalAutoEncoder
+from project_paths import project_path, resolve_output_path
 from utils import ErrorMetrics
 
 # Suppress sparse warnings
@@ -86,9 +90,9 @@ def geometry_loss(z, idxs, D, zeta):
 # ------------------------------
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-h5_path   = 'Data_Generation/train_diffusion_nonlinear.h5'
-dist_path = 'Data_Generation/manifold_dists_train_vorticity.npy'
-save_path = 'Models/Autoencoders/ga_autoencoder.pth'
+h5_path = project_path('Data_Generation', 'train_diffusion_nonlinear.h5')
+dist_path = resolve_output_path('Data_Generation/manifold_dists_train_vorticity.npy')
+save_path = resolve_output_path('Trained_Models/AE/Vorticity/AE_Vorticity_GA.pth')
 
 # Hyperparameters
 batch_size      = 100

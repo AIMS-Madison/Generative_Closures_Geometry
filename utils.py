@@ -1,10 +1,13 @@
+"""Shared runtime, sampling, plotting, and metric utilities."""
+
+import os
+import random
+
+import h5py
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
-import random
-import os
-import h5py
 from torch.utils.data import Dataset
 
 
@@ -15,11 +18,22 @@ def set_seed(seed: int = 42) -> None:
     np.random.seed(seed)
     random.seed(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     os.environ["PYTHONHASHSEED"] = str(seed)
     print(f"Random seed set as {seed}")
+
+
+def resolve_device(device=None):
+    """Resolve ``None`` or ``'auto'`` to the best available PyTorch device."""
+    if device is None or str(device).lower() == 'auto':
+        return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    resolved = torch.device(device)
+    if resolved.type == 'cuda' and not torch.cuda.is_available():
+        raise RuntimeError("CUDA was requested, but torch.cuda.is_available() is False")
+    return resolved
 
 
 ################################
@@ -27,13 +41,15 @@ def set_seed(seed: int = 42) -> None:
 ################################
 def append_zero(x):
     return torch.cat([x, x.new_zeros([1])])
+
+
 def get_sigmas_karras(n, time_min, time_max, rho=7.0, device="cpu"):
     """Constructs the noise schedule of Karras et al. (2022)."""
-    ramp = torch.linspace(0, 1, n)
+    ramp = torch.linspace(0, 1, n, device=device)
     min_inv_rho = time_min ** (1 / rho)
     max_inv_rho = time_max ** (1 / rho)
     sigmas = (max_inv_rho + ramp * (min_inv_rho - max_inv_rho)) ** rho
-    return append_zero(sigmas).to(device)
+    return append_zero(sigmas)
 
 
 ################################
@@ -115,7 +131,8 @@ class ErrorMetrics:
         """Normalized Frobenius Norm Error"""
         error_fro = torch.linalg.matrix_norm(data1 - data2, ord='fro', dim=(1, 2))
         norm_ref = torch.linalg.matrix_norm(data1, ord='fro', dim=(1, 2))
-        return torch.mean(error_fro / norm_ref)
+        eps = torch.finfo(norm_ref.dtype).eps
+        return torch.mean(error_fro / norm_ref.clamp_min(eps))
 
 class H5ClosureDataset(Dataset):
     """
@@ -125,10 +142,13 @@ class H5ClosureDataset(Dataset):
     def __init__(self, filename, key_omega, key_H, max_samples=None, transform=None):
         super().__init__()
         with h5py.File(filename, 'r') as f:
+            missing = [key for key in (key_omega, key_H) if key not in f]
+            if missing:
+                raise KeyError(f"Missing HDF5 dataset(s) {missing} in {filename}")
             v = f[key_omega]
             h = f[key_H]
             n = min(len(v), len(h))
-            if max_samples:
+            if max_samples is not None:
                 n = min(n, max_samples)
             data_o = v[:n]
             data_h = h[:n]

@@ -1,8 +1,9 @@
-import os, sys
+import sys
+from pathlib import Path
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
     
 import warnings
 import numpy as np
@@ -12,8 +13,14 @@ from torch.optim import Adam
 from functools import partial
 from tqdm import trange
 from utils import *
-from Generative_Models import (marginal_prob_std, diffusion_coeff, FNO2d_Diffusion, loss_fn)
+from Models.Generative_Closures.Generative_Models import (
+    FNO2d_Diffusion,
+    diffusion_coeff,
+    loss_fn,
+    marginal_prob_std,
+)
 from Models.Pretrained_Autoencoders.AE import VariationalAutoEncoder
+from project_paths import project_path, resolve_output_path
 
 np.set_printoptions(suppress=False, formatter={'float': '{:.2e}'.format})
 torch.set_printoptions(sci_mode=True)
@@ -27,10 +34,9 @@ else:
     device = torch.device('cpu')
 
 
-### 加载数据
+# Data loading
 def load_data():
-    train_name = 'Data_Generation/train_diffusion_nonlinear.h5'
-    test_name = 'Data_Generation/test_diffusion_nonlinear.h5'
+    train_name = project_path('Data_Generation', 'train_diffusion_nonlinear.h5')
 
     print(f"Loading training data from {train_name}")
     with h5py.File(train_name, 'r') as file:
@@ -121,13 +127,19 @@ def train():
         loss_history.append(avg_loss)
         tqdm_epoch.set_description(f"Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.5f}, Fro Nonlinear: {fro_x:.5f}, Fro Vorticity: {fro_w:.5f}")
 
-    diffusion_model_save = 'Models/Score_Diffusion/Latent_Diffusion/Joint_diffusion.pth'
+    diffusion_model_save = resolve_output_path(
+        'Trained_Models/DM/Latent_DM/Joint_DM.pth'
+    )
     torch.save(diffusion_model.state_dict(), diffusion_model_save)
 
-    AEG_model_save = 'Models/Autoencoders/Joint_AE_Nonlinear.pth'
+    AEG_model_save = resolve_output_path(
+        'Trained_Models/AE/Nonlinear/Joint_AE_Nonlinear_DM.pth'
+    )
     torch.save(AEG_model.state_dict(), AEG_model_save)
 
-    AEW_model_save = 'Models/Autoencoders/Joint_AE_Vorticity.pth'
+    AEW_model_save = resolve_output_path(
+        'Trained_Models/AE/Vorticity/Joint_AE_Vorticity_DM.pth'
+    )
     torch.save(AEW_model.state_dict(), AEW_model_save)
 
 

@@ -1,20 +1,25 @@
-import os, sys
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
     
 import h5py
 import torch
-from AE import VariationalAutoEncoder
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-plt.rc("text", usetex=True)
-mpl.rcParams['text.usetex'] = True
-plt.rcParams["font.family"] = "Times New Roman"
-plt.rcParams["text.latex.preamble"] = r"\usepackage{amsmath}"
+from Models.Pretrained_Autoencoders.AE import VariationalAutoEncoder
+from project_paths import model_path, resolve_input_path, resolve_output_path
 
 import warnings
 warnings.filterwarnings("ignore")
+
+
+def load_weights(path, map_location):
+    """Load a tensor-only state dict on both old and new PyTorch releases."""
+    try:
+        return torch.load(path, map_location=map_location, weights_only=True)
+    except TypeError:
+        return torch.load(path, map_location=map_location)
 
 # Check if CUDA is available
 if torch.cuda.is_available():
@@ -25,27 +30,39 @@ else:
     device = torch.device('cpu')
 
 # Load the data
-train_name = 'Data_Generation/train_diffusion_nonlinear.h5'
+train_name = resolve_input_path(
+    'GCG_TRAIN_DATA', 'Data_Generation/train_diffusion_nonlinear.h5'
+)
 with h5py.File(train_name, 'r') as file:
     train_vorticity = torch.tensor(file['train_vorticity_64'][:], device=device)
     train_nonlinear = torch.tensor(file['train_nonlinear_64'][:], device=device)
 
-test_name = 'Data_Generation/test_diffusion_nonlinear.h5'
+test_name = resolve_input_path(
+    'GCG_TEST_DATA', 'Data_Generation/test_diffusion_nonlinear.h5'
+)
 with h5py.File(test_name, 'r') as file:
     test_vorticity = torch.tensor(file['test_vorticity_64'][:], device=device)
     test_nonlinear = torch.tensor(file['test_nonlinear_64'][:], device=device)
 
 
 convection_AE = VariationalAutoEncoder().to(device)
-convection_AE.load_state_dict(torch.load('Models/Autoencoders/Joint_AE_Nonlinear_FM.pth'))
+convection_AE.load_state_dict(load_weights(
+    model_path('AE', 'Nonlinear', 'Joint_AE_Nonlinear_FM.pth'), device
+))
 
 vorticity_AE = VariationalAutoEncoder().to(device)
-vorticity_AE.load_state_dict(torch.load('Models/Autoencoders/Joint_AE_Vorticity_FM.pth'))
+vorticity_AE.load_state_dict(load_weights(
+    model_path('AE', 'Vorticity', 'Joint_AE_Vorticity_FM.pth'), device
+))
+convection_AE.eval()
+vorticity_AE.eval()
 
 # File to store the encoded outputs.
-filename = 'Data_Generation/train_diffusion_nonlinear_encoded_joint_FM.h5'
+filename = resolve_output_path(
+    'Data_Generation/train_diffusion_nonlinear_encoded_joint_FM.h5'
+)
 batch_size = 1000
-total_samples = 18000
+total_samples = min(18000, len(train_vorticity), len(train_nonlinear))
 
 # Determine the shape of one encoded sample.
 with torch.no_grad():
@@ -114,9 +131,11 @@ print("All batches appended successfully.")
 
 
 # File to store the encoded outputs.
-filename = 'Data_Generation/test_diffusion_nonlinear_encoded_joint_FM.h5'
+filename = resolve_output_path(
+    'Data_Generation/test_diffusion_nonlinear_encoded_joint_FM.h5'
+)
 batch_size = 1000
-total_samples = 2000
+total_samples = min(2000, len(test_vorticity), len(test_nonlinear))
 
 # Determine the shape of one encoded sample.
 with torch.no_grad():

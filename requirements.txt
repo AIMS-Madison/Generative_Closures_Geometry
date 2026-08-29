@@ -1,0 +1,10 @@
+einops
+h5py
+jupyterlab
+matplotlib
+numpy
+phate
+scipy
+seaborn
+torch
+tqdm

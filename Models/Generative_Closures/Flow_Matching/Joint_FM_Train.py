@@ -1,16 +1,19 @@
-import os, sys
+import os
+import sys
+import warnings
+from pathlib import Path
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-import warnings, os
 import torch
 from torch.optim import Adam
 from utils import *
-from Generative_Models import FNO2d_Orig
+from Models.Generative_Closures.Generative_Models import FNO2d_Orig
 from Models.Pretrained_Autoencoders.AE import VariationalAutoEncoder
-from Interpolant import *
+from Models.Generative_Closures.Interpolant import *
+from project_paths import project_path
 warnings.filterwarnings("ignore")
 
 from torch.utils.data import DataLoader
@@ -26,10 +29,17 @@ def train_joint_fm(
         epochs=1000,
         scheduler_step=100,
         scheduler_gamma=0.5,
-        device='cuda',
-        save_dir=r"Flow_Matching//Joint_FM",
+        device='auto',
+        save_dir='Trained_Models/FM/Latent_FM/Joint_training',
         eps: float = 1e-12,  
 ):
+    device = resolve_device(device)
+    h5file = Path(h5file)
+    save_dir = Path(save_dir)
+    if not h5file.is_absolute():
+        h5file = project_path(h5file)
+    if not save_dir.is_absolute():
+        save_dir = project_path(save_dir)
     os.makedirs(save_dir, exist_ok=True)
 
     full_dataset = H5ClosureDataset(h5file, cond_key, targ_key, max_samples=max_samples)
@@ -51,11 +61,11 @@ def train_joint_fm(
         FM_model.train()
         total_loss = 0.0
 
-        # 累积归一化 fm 损失：按样本数加权求 epoch 平均
+        # Accumulate the sample-weighted normalized FM loss.
         total_norm_fm = 0.0
         n_seen = 0
 
-        # 为了保持你原有的打印方式，这里也保留“最后一个 batch 的各分项损失”
+        # Keep the final batch components for concise epoch diagnostics.
         recon_loss_x = recon_loss_w = kl_loss = fm_loss = norm_fm_loss = torch.tensor(0.0, device=device)
         fro_x = fro_w = 0.0
 
@@ -106,7 +116,7 @@ def train_joint_fm(
         avg_norm_fm = total_norm_fm / n_seen if n_seen > 0 else 0.0
 
         print(
-            f"[JointSI] Ep{ep}/{epochs} "
+            f"[JointFM] Ep{ep}/{epochs} "
             f"Loss={avg_loss:.3e} ReconX={recon_loss_x.item():.3e} "
             f"ReconW={recon_loss_w.item():.3e} KL={kl_loss.item():.3e} "
             f"SI={fm_loss.item():.3e} SI_norm_avg={avg_norm_fm:.3e} "
