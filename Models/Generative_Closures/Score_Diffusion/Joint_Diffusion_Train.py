@@ -34,7 +34,6 @@ else:
     device = torch.device('cpu')
 
 
-# Data loading
 def load_data():
     train_name = project_path('Data_Generation', 'train_diffusion_nonlinear.h5')
 
@@ -42,11 +41,6 @@ def load_data():
     with h5py.File(train_name, 'r') as file:
         train_nonlinear = torch.tensor(file['train_nonlinear_64'][:10000], device=device)
         train_vorticity = torch.tensor(file['train_vorticity_64'][:10000], device=device)
-
-    # print(f"Loading testing data from {test_name}")
-    # with h5py.File(test_name, 'r') as file:
-    #     test_nonlinear = torch.tensor(file['test_nonlinear_64'][:], device=device)
-    #     test_vorticity = torch.tensor(file['test_vorticity_64'][:], device=device)
 
     train_loader = torch.utils.data.DataLoader(
         torch.utils.data.TensorDataset(train_nonlinear, train_vorticity, torch.arange(len(train_nonlinear))),
@@ -94,7 +88,6 @@ def train():
             x, w, idx = x.to(device), w.to(device), idx.to(device)
             optimizer.zero_grad()
 
-            # Autoencoder forward
             latent_x = AEG_model.encode(x)
             recon_x = AEG_model.decode(latent_x)
             fro_x = metrics.frobenius(x, recon_x)

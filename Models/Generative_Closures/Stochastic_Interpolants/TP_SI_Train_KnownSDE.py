@@ -15,7 +15,6 @@ from utils import resolve_device
 device = resolve_device('auto')
 
 
-# 1) Train in GA latent space
 train_file = project_path('Data_Generation', 'train_diffusion_nonlinear_encoded_GA.h5')
 with h5py.File(train_file, 'r') as file:
     train_nonlinear = torch.tensor(file['train_nonlinear_encoded'][:], device=device)

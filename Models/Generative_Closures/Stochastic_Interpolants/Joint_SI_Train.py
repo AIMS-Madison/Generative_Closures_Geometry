@@ -64,23 +64,19 @@ def train_joint_si(
             x, w = x.to(device), w.to(device)
             optimizer.zero_grad()
 
-            # Autoencoder encode/decode
             latent_x = AEH_model.encode(x)
             recon_x = AEH_model.decode(latent_x)
             latent_w = AEW_model.encode(w)
             recon_w = AEW_model.decode(latent_w)
 
-            # loss - reconstruction
             recon_loss_x = mse(recon_x, x) * 1000
             recon_loss_w = mse(recon_w, w)
 
-            # loss - KL on latent_x
             flat_latent = latent_x.view(latent_x.size(0), -1)
             mean = flat_latent.mean(dim=0)
             var = flat_latent.var(dim=0, unbiased=True)
             kl_loss = 0.5 * (var + mean**2 - 1 - torch.log(var + 1e-8)).mean() * 0.1
 
-            # SI loss in latent space
             B = latent_x.size(0)
             t = torch.rand(B, device=device)
             xt, R = interp.sample_knownbase(latent_x, latent_w, t)
@@ -106,7 +102,6 @@ def train_joint_si(
     torch.save(AEH_model.state_dict(), os.path.join(save_dir, 'Joint_AE_Nonlinear_SI_KnownSDE.pth'))
     torch.save(AEW_model.state_dict(), os.path.join(save_dir, 'Joint_AE_Vorticity_SI_KnownSDE.pth'))
 
-    # Save final loss statistics.
     with open(os.path.join(save_dir, 'loss_stats.txt'), 'a') as f:
         f.write(f"{ep} {avg_loss:.3e} {recon_loss_x.item():.3e} {recon_loss_w.item():.3e} "
                 f"{kl_loss.item():.3e} {si_loss.item():.3e} {fro_x:.3e} {fro_w:.3e}\n")

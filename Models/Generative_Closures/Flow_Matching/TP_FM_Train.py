@@ -15,7 +15,7 @@ from utils import resolve_device
 device = resolve_device('auto')
 
 
-# 1) Train in GA latent space
+# GA latent space
 train_file = project_path('Data_Generation', 'train_diffusion_nonlinear_encoded_GA.h5')
 with h5py.File(train_file, 'r') as file:
     train_nonlinear = torch.tensor(file['train_nonlinear_encoded'][:], device=device)
@@ -37,7 +37,7 @@ trained_model = train_fno_interpolant(
 
 
 
-# 2) Train in MP latent space
+# MP latent space
 train_file = project_path('Data_Generation', 'train_diffusion_nonlinear_encoded_MP.h5')
 with h5py.File(train_file, 'r') as file:
     train_nonlinear = torch.tensor(file['train_nonlinear_encoded'][:], device=device)
@@ -57,7 +57,7 @@ trained_model = train_fno_interpolant(
     save_loss=resolve_output_path('training_logs/FM_MP_loss.txt')
 )
 
-# 3) Train in vanilla latent space
+# Reconstruction-only latent space
 train_file = project_path('Data_Generation', 'train_diffusion_nonlinear_encoded.h5')
 with h5py.File(train_file, 'r') as file:
     train_nonlinear = torch.tensor(file['train_nonlinear_encoded'][:], device=device)
@@ -77,7 +77,7 @@ trained_model = train_fno_interpolant(
     save_loss=resolve_output_path('training_logs/FM_NoReg_loss.txt')
 )
 
-# 4) Train in physical space
+# Physical space
 train_file = project_path('Data_Generation', 'train_diffusion_nonlinear.h5')
 with h5py.File(train_file, 'r') as file:
     train_nonlinear = torch.tensor(file['train_nonlinear_64'][:], device=device)

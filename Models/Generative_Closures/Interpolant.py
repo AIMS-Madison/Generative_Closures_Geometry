@@ -6,9 +6,6 @@ from torch.utils.data import TensorDataset
 import math
 
 
-# ----------------------------------
-# 1. Interpolant helper for linear SI
-# ----------------------------------
 class Interpolant:
     def __init__(self, device='cuda'):
         self.device = device
@@ -27,20 +24,17 @@ class Interpolant:
         t_ = t.view(B, 1, 1).to(self.device) * (1-1e-6) + 1e-6
 
         a, b      = 1 - t_,    t_
-        a_dot     = -torch.ones_like(t_)   # d/dt[(1-t)] = -1
-        b_dot     =  torch.ones_like(t_)   # d/dt[t]     =  1
+        a_dot     = -torch.ones_like(t_)
+        b_dot     =  torch.ones_like(t_)
 
-        # We want (1-t) * W_t = (1-t) * (sqrt(t) * noise)
         gamma     = 1 - t_
-        gamma_dot = -torch.ones_like(t_)     # d/dt[t] = -1
+        gamma_dot = -torch.ones_like(t_)
 
         noise = torch.randn_like(target, device=self.device)
-        W_t   = torch.sqrt(t_) * noise      # W_t ~ N(0, t I)
+        W_t   = torch.sqrt(t_) * noise
 
-        # 1) z_t = (1-t)*condition + t*target + t * W_t
         zt = a * condition + b * target + gamma * W_t
 
-        # 2) R_t = -condition + target + W_t
         R  = a_dot * condition + b_dot * target + gamma_dot * W_t
 
         return zt, R
@@ -61,19 +55,16 @@ class Interpolant:
         a_dot     = -torch.ones_like(t_)
         b_dot     =  torch.ones_like(t_)
 
-        # We want (1-t) * W_t = (1-t) * (sqrt(t) * noise)
         gamma     = 1 - t_
-        gamma_dot = -torch.ones_like(t_)     # d/dt[t] = -1
+        gamma_dot = -torch.ones_like(t_)
 
         noise = torch.randn_like(target, device=self.device)
-        W_t   = torch.sqrt(t_) * noise      # W_t ~ N(0, t I)
+        W_t   = torch.sqrt(t_) * noise
 
         noise_start = torch.randn_like(target, device=self.device)
 
-        # 1) z_t = (1-t)*Z + t*target + t * W_t
         zt = a * noise_start + b * target + gamma * W_t
 
-        # 2) R_t = -Z + target + W_t
         R  = a_dot * noise_start + b_dot * target + gamma_dot * W_t
 
         return zt, R
@@ -96,10 +87,8 @@ class Interpolant:
 
         noise_start = torch.randn_like(target, device=self.device)
 
-        # 1) z_t = (1-t)*Z + t*target
         zt = a * noise_start + b * target
 
-        # 2) R_t = -Z + target
         R = a_dot * noise_start + b_dot * target
 
         return zt, R
@@ -159,7 +148,6 @@ def train_fno_interpolant(
 
             loss = mse(pred, velocity)
 
-            # ===== 计算归一化 loss =====
             v_flat = velocity.reshape(B, -1)
             v_power = (v_flat.pow(2).sum(dim=1)).mean()  # E||v||^2
             norm_loss = loss / (v_power + eps)
@@ -177,7 +165,6 @@ def train_fno_interpolant(
 
         print(f"[LinSI:{mode}] Ep{ep}/{epochs} loss={avg_loss:.3e} norm_loss={avg_norm_loss:.3e}")
 
-        # 保存原始和归一化 loss
         with open(save_loss, 'a') as f:
             f.write(f"{ep} {avg_loss:.6e} {avg_norm_loss:.6e}\n")
 
@@ -204,47 +191,37 @@ def sample_closure_latent(
     omega = z_omega.to(device)
     B, n, _ = omega.shape
 
-    # replicate ω for ensembles
     omega_rep = omega.unsqueeze(1).repeat(1, num_ensembles, 1, 1)
     omega_rep = omega_rep.view(-1, n, n)  # (B*num_ensembles, n, n)
 
-    # initial X₀ = x_t
     if start_gaussian:
-        # sample from prior
         zt = torch.randn_like(omega_rep, device=device)
     else:
         zt = omega_rep.clone()
 
-    # time‐grid
     ts = torch.linspace(0.0, 1.0, num_steps, device=device)
     dt = 1.0 / (num_steps - 1)
 
     with torch.no_grad():
         for i, t in enumerate(ts):
-            # prepare batches
             t_batch   = t.repeat(B * num_ensembles)
 
-            # base learned drift
             drift = drift_model(t_batch, zt, omega_rep)
 
-            # original noise schedule σₛ = σ_coef·(1−s)
             sigma_t = sigma_coef * (1.0 - t)
 
             if use_follmer:
-                # simple interpolant schedules
                 alpha_t   = 1.0 - t
                 beta_t    = t * t
                 alpha_dot = -1.0
                 beta_dot  = 2.0 * t
                 sigma_dot = -sigma_coef
 
-                # compute Föllmer‐optimal diffusion
                 g_t = math.sqrt(abs(
                     2 * t * sigma_t * (beta_dot * sigma_t - beta_t * sigma_dot)
                     - sigma_t**2
                 ))
 
-                # closed‐form score: ∇_x log ρₛ
                 # Aₛ = 1 / [s σₛ (β̇ₛσₛ - βₛσ̇ₛ)]
                 denom = (t * sigma_t * (beta_dot * sigma_t - beta_t * sigma_dot))
                 A_t = 1.0 / (denom + 1e-12)
@@ -254,20 +231,16 @@ def sample_closure_latent(
 
                 score = A_t * (beta_t * drift - c_t)
 
-                # corrected drift
                 drift = drift + 0.5 * (g_t**2 - sigma_t**2) * score
                 noise_scale = g_t
 
             else:
                 noise_scale = sigma_t
 
-            # Euler–Maruyama update
             if i < num_steps - 1:
                 noise = torch.randn_like(zt, device=device)
                 zt = zt + drift * dt + noise_scale * math.sqrt(dt) * noise
             else:
-                # last step: deterministic
                 zt = zt + drift * dt
 
-    # reshape back to (B, ensembles, n, n)
     return zt.view(B, num_ensembles, n, n)

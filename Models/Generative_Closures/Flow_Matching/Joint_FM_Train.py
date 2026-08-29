@@ -61,11 +61,9 @@ def train_joint_fm(
         FM_model.train()
         total_loss = 0.0
 
-        # Accumulate the sample-weighted normalized FM loss.
         total_norm_fm = 0.0
         n_seen = 0
 
-        # Keep the final batch components for concise epoch diagnostics.
         recon_loss_x = recon_loss_w = kl_loss = fm_loss = norm_fm_loss = torch.tensor(0.0, device=device)
         fro_x = fro_w = 0.0
 
@@ -73,23 +71,19 @@ def train_joint_fm(
             x, w = x.to(device), w.to(device)
             optimizer.zero_grad()
 
-            # Autoencoder encode/decode
             latent_x = AEH_model.encode(x)
             recon_x = AEH_model.decode(latent_x)
             latent_w = AEW_model.encode(w)
             recon_w = AEW_model.decode(latent_w)
 
-            # loss - reconstruction
             recon_loss_x = mse(recon_x, x) * 1000
             recon_loss_w = mse(recon_w, w)
 
-            # loss - KL on latent_x
             flat_latent = latent_x.view(latent_x.size(0), -1)
             mean = flat_latent.mean(dim=0)
             var = flat_latent.var(dim=0, unbiased=True)
             kl_loss = 0.5 * (var + mean ** 2 - 1 - torch.log(var + 1e-8)).mean() * 0.1
 
-            # SI loss in latent space
             B = latent_x.size(0)
             t = torch.rand(B, device=device)
             xt, R = interp.sample_gaussianbase_ode(latent_x, t)

@@ -21,7 +21,6 @@ def load_weights(path, map_location):
     except TypeError:
         return torch.load(path, map_location=map_location)
 
-# Check if CUDA is available
 if torch.cuda.is_available():
     print("CUDA is available.")
     device = torch.device('cuda')
@@ -29,7 +28,6 @@ else:
     print("CUDA is not available.")
     device = torch.device('cpu')
 
-# Load the data
 train_name = resolve_input_path(
     'GCG_TRAIN_DATA', 'Data_Generation/train_diffusion_nonlinear.h5'
 )
@@ -57,27 +55,22 @@ vorticity_AE.load_state_dict(load_weights(
 convection_AE.eval()
 vorticity_AE.eval()
 
-# File to store the encoded outputs.
 filename = resolve_output_path(
     'Data_Generation/train_diffusion_nonlinear_encoded_joint_FM.h5'
 )
 batch_size = 1000
 total_samples = min(18000, len(train_vorticity), len(train_nonlinear))
 
-# Determine the shape of one encoded sample.
 with torch.no_grad():
     sample_vort = vorticity_AE.encode(train_vorticity[0:1])
     sample_nonlin = convection_AE.encode(train_nonlinear[0:1])
 
-# Ensure the sample shape is (16, 16) (i.e. without channel dimension).
 sample_shape_vort = sample_vort[0].shape  # expected: (16, 16)
 sample_shape_nonlin = sample_nonlin[0].shape  # expected: (16, 16)
 print("Encoded vorticity sample shape:", sample_shape_vort)
 print("Encoded nonlinear sample shape:", sample_shape_nonlin)
 
-# Create the HDF5 file and datasets.
 with h5py.File(filename, 'w') as file:
-    # Create chunked datasets with an initial size of 0 along the first axis.
     dset_vort = file.create_dataset(
         'train_vorticity_encoded',
         shape=(0,) + sample_shape_vort,
@@ -93,9 +86,7 @@ with h5py.File(filename, 'w') as file:
         dtype='double'
     )
 
-    # Process the data in batches.
     for i in range(0, total_samples, batch_size):
-        # Process each batch on GPU (ensuring gradients are not tracked).
         with torch.no_grad():
             batch_vort = vorticity_AE.encode(
                 train_vorticity[i:i + batch_size]
@@ -104,19 +95,15 @@ with h5py.File(filename, 'w') as file:
                 train_nonlinear[i:i + batch_size]
             )
 
-        # Convert to NumPy arrays (on CPU).
         batch_vort_np = batch_vort.cpu().numpy()
         batch_nonlin_np = batch_nonlin.cpu().numpy()
 
-        # Get current size of the datasets along the first axis.
         cur_size = dset_vort.shape[0]
         new_size = cur_size + batch_vort_np.shape[0]
 
-        # Resize datasets to accommodate the new batch.
         dset_vort.resize(new_size, axis=0)
         dset_nonlin.resize(new_size, axis=0)
 
-        # Write the batch data.
         dset_vort[cur_size:new_size] = batch_vort_np
         dset_nonlin[cur_size:new_size] = batch_nonlin_np
 
@@ -130,27 +117,22 @@ print("All batches appended successfully.")
 
 
 
-# File to store the encoded outputs.
 filename = resolve_output_path(
     'Data_Generation/test_diffusion_nonlinear_encoded_joint_FM.h5'
 )
 batch_size = 1000
 total_samples = min(2000, len(test_vorticity), len(test_nonlinear))
 
-# Determine the shape of one encoded sample.
 with torch.no_grad():
     sample_vort = vorticity_AE.encode(test_vorticity[0:1])
     sample_nonlin = convection_AE.encode(test_nonlinear[0:1])
 
-# Ensure the sample shape is (16, 16) (i.e. without channel dimension).
 sample_shape_vort = sample_vort[0].shape  # expected: (16, 16)
 sample_shape_nonlin = sample_nonlin[0].shape  # expected: (16, 16)
 print("Encoded vorticity sample shape:", sample_shape_vort)
 print("Encoded nonlinear sample shape:", sample_shape_nonlin)
 
-# Create the HDF5 file and datasets.
 with h5py.File(filename, 'w') as file:
-    # Create chunked datasets with an initial size of 0 along the first axis.
     dset_vort = file.create_dataset(
         'test_vorticity_encoded',
         shape=(0,) + sample_shape_vort,
@@ -166,9 +148,7 @@ with h5py.File(filename, 'w') as file:
         dtype='double'
     )
 
-    # Process the data in batches.
     for i in range(0, total_samples, batch_size):
-        # Process each batch on GPU (ensuring gradients are not tracked).
         with torch.no_grad():
             batch_vort = vorticity_AE.encode(
                 test_vorticity[i:i + batch_size]
@@ -177,26 +157,21 @@ with h5py.File(filename, 'w') as file:
                 test_nonlinear[i:i + batch_size]
             )
 
-        # Convert to NumPy arrays (on CPU).
         batch_vort_np = batch_vort.cpu().numpy()
         batch_nonlin_np = batch_nonlin.cpu().numpy()
 
-        # Get current size of the datasets along the first axis.
         cur_size = dset_vort.shape[0]
         new_size = cur_size + batch_vort_np.shape[0]
 
-        # Resize datasets to accommodate the new batch.
         dset_vort.resize(new_size, axis=0)
         dset_nonlin.resize(new_size, axis=0)
 
-        # Write the batch data.
         dset_vort[cur_size:new_size] = batch_vort_np
         dset_nonlin[cur_size:new_size] = batch_nonlin_np
 
         print(f"Appended samples {cur_size} to {new_size - 1}")
 
 print("All batches appended successfully.")
-#
 
 with torch.no_grad():
     sample_vort = vorticity_AE.encode(train_vorticity[0:500])
@@ -207,7 +182,6 @@ with torch.no_grad():
 from utils import ErrorMetrics
 metric = ErrorMetrics()
 
-# Calculate the error metrics
 vorticity_error = metric.frobenius(train_vorticity[0:500], decoded_vort)
 vorticity_mse = metric.mse(train_vorticity[0:500], decoded_vort)
 print(f"Vorticity error: {vorticity_error.item():.3e}")

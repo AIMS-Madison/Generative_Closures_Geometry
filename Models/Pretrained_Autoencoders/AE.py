@@ -2,10 +2,6 @@ import torch
 import torch.nn as nn
 from einops import rearrange
 
-################################
-######## AE Model setup ########
-################################
-
 def weights_init(m):
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')

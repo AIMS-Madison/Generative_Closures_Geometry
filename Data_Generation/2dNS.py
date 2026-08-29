@@ -49,8 +49,6 @@ bsize = 1000
 c = 0
 t0 = default_timer()
 
-# sol_col = torch.zeros(N, s, s, record_steps+1).to(device)
-# sol_col_128 = torch.zeros(N, s//2, s//2, record_steps+1).to(device)
 sol_col_64 = torch.zeros(N, s, s, record_steps+1).to(device)
 
 
@@ -67,8 +65,6 @@ for j in range(N // bsize):
     t1 = default_timer()
     print(j, c, t1 - t0)
 
-    # sol_col[j * bsize:(j + 1) * bsize] = sol
-    # sol_col_128[j * bsize:(j + 1) * bsize] = sol[:, ::2, ::2, :]
     sol_col_64[j * bsize:(j + 1) * bsize] = sol[:, :, :, :]
     nonlinear_col[j * bsize:(j + 1) * bsize] = nonlinear_term
     diffusion_col[j * bsize:(j + 1) * bsize] = diffusion_term
@@ -82,18 +78,12 @@ test_vorticity_64 = sol_col_64[90:100,..., :].permute(0,3,1,2).reshape(-1, s, s)
 test_nonlinear_64 = nonlinear_col[90:100,..., :].permute(0,3,1,2).reshape(-1, s, s)
 test_diffusion_64 = diffusion_col[90:100,..., :].permute(0,3,1,2).reshape(-1, s, s)
 
-# test_vorticity_128 = sol_col_128[500:600,..., :100]
-# test_nonlinear_128 = nonlinear_col_128[500:600,..., :100]
-# test_vorticity_256 = sol_col[500:600,..., :100]
-# test_nonlinear_256 = nonlinear_col[500:600,..., :100]
-
 filename = 'train_diffusion_nonlinear.h5'
 with h5py.File(filename, 'w') as file:
     file.create_dataset('t', data=sol_t.cpu().numpy())
     file.create_dataset('train_vorticity_64', data=train_vorticity_64.cpu().numpy())
     file.create_dataset('train_nonlinear_64', data=train_nonlinear_64.cpu().numpy())
     file.create_dataset('train_diffusion_64', data=train_diffusion_64.cpu().numpy())
-    # save stochastic forcing configs as dictionary
     file.create_dataset('stochastic_forcing', data=np.array([stochastic_forcing['alpha'], stochastic_forcing['kappa'], stochastic_forcing['sigma']]))
 
 filename = 'test_diffusion_nonlinear.h5'
@@ -102,8 +92,3 @@ with h5py.File(filename, 'w') as file:
     file.create_dataset('test_vorticity_64', data=test_vorticity_64.cpu().numpy())
     file.create_dataset('test_nonlinear_64', data=test_nonlinear_64.cpu().numpy())
     file.create_dataset('test_diffusion_64', data=test_diffusion_64.cpu().numpy())
-    
-    # file.create_dataset('test_vorticity_128', data=test_vorticity_128.cpu().numpy())
-    # file.create_dataset('test_nonlinear_128', data=test_nonlinear_128.cpu().numpy())
-    # file.create_dataset('test_vorticity_256', data=test_vorticity_256.cpu().numpy())
-    # file.create_dataset('test_nonlinear_256', data=test_nonlinear_256.cpu().numpy())

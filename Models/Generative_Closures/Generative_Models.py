@@ -3,11 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-################################
-######### SDE setup ############
-################################
-
-# Set up VE SDE for diffusion process
 def marginal_prob_std(t, sigma, device_):
     """Compute the mean and standard deviation of $p_{0t}(x(t) | x(0))$.
 
@@ -35,11 +30,6 @@ def diffusion_coeff(t, sigma, device_):
     """
     return torch.as_tensor(sigma ** t, device=device_)
 
-################################
-######## Model setup #######
-################################
-
-# Diffusion process time step encoding
 class GaussianFourierProjection(nn.Module):
     """Gaussian random features for encoding time steps."""
 
@@ -54,7 +44,6 @@ class GaussianFourierProjection(nn.Module):
         return torch.cat([torch.sin(x_proj), torch.cos(x_proj)], dim=-1)
 
 
-# Dense layer for encoding time steps
 class Dense(nn.Module):
     """A fully connected layer that reshapes outputs to feature maps."""
 
@@ -66,7 +55,6 @@ class Dense(nn.Module):
         return self.dense(x)[..., None, None, None]
 
 
-# 2d Fourier layer
 class SpectralConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, modes1, modes2):
         super().__init__()
@@ -81,7 +69,6 @@ class SpectralConv2d(nn.Module):
         self.weights2 = nn.Parameter(
             self.scale * torch.rand(in_channels, out_channels, self.modes1, self.modes2, dtype=torch.cfloat))
 
-    # Complex multiplication
     def compl_mul2d(self, input, weights):
         # (batch, in_channel, x,y ), (in_channel, out_channel, x,y) -> (batch, out_channel, x,y)
         return torch.einsum("bixy,ioxy->boxy", input, weights)
@@ -138,11 +125,10 @@ class FNO2d_Orig(nn.Module):
 
         self.dense0 = Dense(embed_dim, self.width)
 
-        # Define a transformation network for the concatenated output
         self.transformation_net = nn.Sequential(
-            nn.Conv2d(width * 2, width, 1),  # Reduce dimensionality while combining information
+            nn.Conv2d(width * 2, width, 1),
             nn.GELU(),
-            nn.Conv2d(width, width, 1),  # Optional: another layer to refine features
+            nn.Conv2d(width, width, 1),
             nn.GELU()
         )
 
@@ -271,11 +257,10 @@ class FNO2d_Diffusion(nn.Module):
 
         self.dense0 = Dense(embed_dim, self.width)
 
-        # Define a transformation network for the concatenated output
         self.transformation_net = nn.Sequential(
-            nn.Conv2d(width*2, width, 1),  # Reduce dimensionality while combining information
+            nn.Conv2d(width*2, width, 1),
             nn.GELU(),
-            nn.Conv2d(width, width, 1),  # Optional: another layer to refine features
+            nn.Conv2d(width, width, 1),
             nn.GELU()
         )
 
@@ -366,7 +351,6 @@ class FNO2d_Diffusion(nn.Module):
         return torch.cat((gridx, gridy), dim=-1).to(device)
 
 
-# Loss function
 def loss_fn(model, x, w, conditions, marginal_prob_std, eps=1e-5, sparse = False):
   random_t = torch.rand(x.shape[0], device=x.device) * (1 - eps) + eps
   z = torch.randn_like(x)

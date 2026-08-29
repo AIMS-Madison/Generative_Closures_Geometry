@@ -19,7 +19,6 @@ from Models.Generative_Closures.Generative_Models import (
 )
 from project_paths import project_path, resolve_output_path
 
-# Check if CUDA is available
 if torch.cuda.is_available():
     print("CUDA is available.")
     device = torch.device('cuda')
@@ -27,7 +26,6 @@ else:
     print("CUDA is not available.")
     device = torch.device('cpu')
 
-# Load the data
 train_name = project_path('Data_Generation', 'train_diffusion_nonlinear.h5')
 
 
@@ -54,9 +52,6 @@ with torch.no_grad():
         print(current_max_dist)
     print('Final, max eucledian distance: {}'.format(current_max_dist))
 
-################################
-######## Model Training ########
-################################
 sigma = 30
 marginal_prob_std_fn = partial(marginal_prob_std, sigma=sigma, device_=device)
 diffusion_coeff_fn = partial(diffusion_coeff, sigma=sigma, device_=device)
@@ -90,9 +85,6 @@ for epoch in tqdm_epoch:
         optimizer.step()
         avg_loss += loss.item() * x.shape[0]
         num_items += x.shape[0]
-        # relative_loss = torch.mean(torch.norm(score - real_score, 2, dim=(1, 2))
-        #                            / torch.norm(real_score, 2, dim=(1, 2)))
-        # rel_err.append(relative_loss.item())
     scheduler.step()
     avg_loss_epoch = avg_loss / num_items
     loss_history.append(avg_loss_epoch)

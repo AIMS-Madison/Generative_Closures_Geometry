@@ -12,9 +12,6 @@ from Models.Pretrained_Autoencoders.AE import VariationalAutoEncoder
 from project_paths import project_path, resolve_output_path
 from utils import ErrorMetrics
 
-# ------------------------------
-# Data loading
-# ------------------------------
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 file_name = project_path('Data_Generation', 'train_diffusion_nonlinear.h5')
@@ -25,35 +22,23 @@ with h5py.File(file_name, 'r') as file:
 train_loader = torch.utils.data.DataLoader(X_train, batch_size=180, shuffle=True)
 test_loader = torch.utils.data.DataLoader(X_test, batch_size=10, shuffle=False)
 
-# ------------------------------
-# Model, optimizer, etc.
-# ------------------------------
 model = VariationalAutoEncoder().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.8, patience=30)
 recon_criterion = nn.MSELoss()
 
-# Hyperparameters for AE loss
-beta_kl = 0.0       # no KL for baseline
-gamma_loc = 1e-2    # weight for local closeness term
-k_neighbors = 5
-
-# Training loop with early stopping
 num_epochs = 1000
 patience   = 1000
 best_val_loss = float('inf')
 counter = 0
 metrics = ErrorMetrics()
-# Training loop with local closeness
 for epoch in range(1, num_epochs+1):
     model.train()
     train_loss, train_fro = 0.0, 0.0
     for inputs in train_loader:
         inputs = inputs.to(device)
-        # encode and decode
         latent = model.encode(inputs)
         decoded = model.decode(latent)
-        # reconstruction loss
         recon_loss = recon_criterion(decoded, inputs)
         loss = recon_loss
         optimizer.zero_grad()
@@ -63,7 +48,6 @@ for epoch in range(1, num_epochs+1):
         train_fro  += metrics.frobenius(inputs, decoded)
     train_loss /= len(train_loader.dataset)
     train_fro  /= len(train_loader)
-    # validation
     model.eval()
     val_loss, val_fro = 0.0, 0.0
     with torch.no_grad():
@@ -80,7 +64,6 @@ for epoch in range(1, num_epochs+1):
             f'| Train Frobenius:{train_fro:.4e} '
           f'| Val Loss:{val_loss:.4e} | Val Frobenius:{val_fro:.4e} ')
     scheduler.step(val_loss)
-    # early stopping
     if val_loss < best_val_loss:
         best_val_loss = val_loss
         counter = 0
