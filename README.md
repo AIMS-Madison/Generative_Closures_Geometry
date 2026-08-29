@@ -1,4 +1,4 @@
-# Generative Closures with Latent Geometry
+# Synergizing transport-based generative models and latent geometry for stochastic closure modeling
 
 Official implementation of the paper ["Synergizing transport-based generative models and latent geometry for stochastic closure modeling"](https://doi.org/10.1016/j.cpc.2026.110341).
 
