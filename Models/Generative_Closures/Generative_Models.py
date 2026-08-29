@@ -19,7 +19,7 @@ def marginal_prob_std(t, sigma, device_):
     Returns:
       The standard deviation.
     """
-    t = torch.tensor(t, device=device_)
+    t = torch.as_tensor(t, device=device_)
     return torch.sqrt((sigma ** (2 * t) - 1.) / 2. / np.log(sigma))
 
 def diffusion_coeff(t, sigma, device_):
@@ -33,7 +33,7 @@ def diffusion_coeff(t, sigma, device_):
     Returns:
       The vector of diffusion coefficients.
     """
-    return torch.tensor(sigma ** t, device=device_)
+    return torch.as_tensor(sigma ** t, device=device_)
 
 ################################
 ######## Model setup #######
